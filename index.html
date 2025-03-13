@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en" x-data="{
+    leftCat: null,
+    rightCat: null,
+    winnerCat: null,
+    newOpponent: null,
+    topCats: [],
+    fetchRandomCats() {
+        fetch('/api/random')
+            .then(response => response.json())
+            .then(data => {
+                this.leftCat = data[0];
+                this.rightCat = data[1];
+            });
+    },
+    fetchTopCats() {
+        fetch('/api/top')
+            .then(response => response.json())
+            .then(data => {
+                this.topCats = data;
+            });
+    },
+    startMatch(winner) {
+        const loser = winner === 'left' ? this.rightCat : this.leftCat;
+
+        // Send match result to the server
+        fetch('/api/match', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                winner_id: winner === 'left' ? this.leftCat.id : this.rightCat.id,
+                loser_id: loser.id
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Update the ELO of the winner
+            this.winnerCat = data.winner;
+            this.newOpponent = data.new_opponent;
+
+            // If left cat wins, we keep it in the left slot and replace the right cat with the new opponent
+            if (winner === 'left') {
+                this.leftCat = this.winnerCat;  // Update the left cat's ELO
+                this.rightCat = this.newOpponent;  // New opponent for right cat
+            } else {
+                // If right cat wins, we replace the left cat with the new opponent
+                this.rightCat = this.winnerCat;  // Update the right cat's ELO
+                this.leftCat = this.newOpponent;  // New opponent for left cat
+            }
+
+            // Update the top cats list after the match
+            this.fetchTopCats();
+        });
+    }
+}" x-init="fetchRandomCats(); fetchTopCats()">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cat ELO</title>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@2.8.2/dist/alpine.js" defer></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f7fc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            color: #333;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin-top: 20px;
+        }
+
+        .top-section {
+            text-align: center;
+            font-size: 36px;
+            color: #444;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .middle-section {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            align-items: center;
+            text-align: center;
+            gap: 20px;
+        }
+
+        .cat-card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+            cursor: pointer;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .cat-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .cat-image {
+            width: 250px;
+            height: 250px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .cat-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .cat-elo {
+            font-size: 16px;
+            color: #777;
+            margin-top: 8px;
+        }
+
+        .top-cats-label {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            margin-top: 30px;
+            color: #333;
+            text-align: center;
+        }
+
+        .top-cats-list {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .top-cat-card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            text-align: center;
+        }
+
+        .top-cat-image {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .versus {
+            font-size: 32px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .footer {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-section">
+                <h1>Cat ELO</h1>
+                <h3>Click to choose the winner</h3>
+        </div>
+
+        <div class="middle-section">
+            <div>
+                <div class="cat-card" x-show="leftCat" @click="startMatch('left')">
+                    <img :src="leftCat?.image" :alt="leftCat?.title" class="cat-image">
+                    <div class="cat-name" x-text="leftCat?.title"></div>
+                    <div class="cat-elo" x-text="'ELO: ' + leftCat?.elo"></div>
+                </div>
+            </div>
+
+            <div class="versus">VS</div>
+
+            <div>
+                <div class="cat-card" x-show="rightCat" @click="startMatch('right')">
+                    <img :src="rightCat?.image" :alt="rightCat?.title" class="cat-image">
+                    <div class="cat-name" x-text="rightCat?.title"></div>
+                    <div class="cat-elo" x-text="'ELO: ' + rightCat?.elo"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Cats Section -->
+        <div class="top-cats-label">Top Cats</div>
+        <div class="top-cats-list">
+            <template x-for="cat in topCats" :key="cat.id">
+                <div class="top-cat-card">
+                    <img :src="cat.image" :alt="cat.title" class="top-cat-image">
+                    <div class="cat-name" x-text="cat.title"></div>
+                    <div class="cat-elo" x-text="'ELO: ' + cat.elo"></div>
+                </div>
+            </template>
+        </div>
+    </div>
+</body>
+</html>
